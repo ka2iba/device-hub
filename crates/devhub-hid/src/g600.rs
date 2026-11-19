@@ -48,7 +48,12 @@ enum Write<'a> {
     Select(u8),
     Profile(u8, &'a Report),
     /// 現在の DPI 段の再設定 `[F0, 40|(r<<1), 0, 0]`。保存済みの DPI を即時に反映させる (§3.9 E5)。
-    Resolution(u8),
+    /// `profile` は段 `r` を検証したプロファイル。送信直前の使用中プロファイルが違えば送らない
+    /// (本体のボタンでプロファイルが変わった場合に、別プロファイルの無効段を選ばないため)。
+    Resolution {
+        profile: u8,
+        r: u8,
+    },
 }
 
 pub fn open(dev: hidapi::HidDevice, info: DeviceInfo, events: Option<Watcher>) -> HubResult<G600> {
@@ -375,7 +380,12 @@ impl G600 {
                 select = [STATUS, 0x80 | (p << 4), 0, 0];
                 select.as_slice()
             }
-            Write::Resolution(r) if usize::from(r) < DPI_SLOTS.len() => {
+            Write::Resolution { profile, r } if usize::from(r) < DPI_SLOTS.len() => {
+                if profile != active {
+                    return Err(protocol(
+                        "G600: プロファイルが切り替わったため DPI の再設定を中止しました",
+                    ));
+                }
                 select = [STATUS, 0x40 | (r << 1), 0, 0];
                 select.as_slice()
             }
@@ -415,6 +425,10 @@ impl G600 {
     /// アクティブなプロファイル `data` の既定段で解像度を再設定し、保存済みの DPI を即時に反映させる。
     /// 既定段が無効 (範囲外・DPI 0) なら何も送らない。反映後は 0xF2 で効いている DPI を照合する。
     fn apply_resolution(&self, data: &Report) -> HubResult<()> {
+        let profile = data[0].wrapping_sub(FIRST_PROFILE);
+        if profile >= PROFILE_COUNT {
+            return Err(protocol("G600: プロファイルのレポート ID が不正です"));
+        }
         let Some(r) = data[13]
             .checked_sub(1)
             .filter(|&r| usize::from(r) < DPI_SLOTS.len())
@@ -425,7 +439,7 @@ impl G600 {
         if units == 0 {
             return Err(protocol("G600: 既定の DPI 段が無効です"));
         }
-        self.guarded_set(Write::Resolution(r))?;
+        self.guarded_set(Write::Resolution { profile, r })?;
         if self.ch.get_feature_id(DPI_STATE, 5)?[3] != units {
             return Err(protocol("G600: DPI の反映を確認できませんでした"));
         }

@@ -62,6 +62,23 @@ fn get(dev: &HidDevice, id: u8, len: usize) -> Option<Vec<u8>> {
     }
 }
 
+/// bit3==1 (待機中) を最大 3 秒待つ (§3.8)。待てなければ終了する。
+fn wait_ready(dev: &HidDevice) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    loop {
+        if let Some(s) = get(dev, 0xF0, 4) {
+            if s[1] & 8 != 0 {
+                return;
+            }
+        }
+        if std::time::Instant::now() > deadline {
+            eprintln!("本体が保存処理中のまま (bit3=0) か、0xF0 を読めません。送らずに終了します");
+            std::process::exit(1);
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+}
+
 /// 0xF0 を読んで表示し、アクティブなプロファイル番号を返す。
 fn status(dev: &HidDevice) -> Option<u8> {
     let s = get(dev, 0xF0, 4)?;
@@ -90,7 +107,10 @@ fn compare(label: &str, got: &[u8], want: &[u8; LEN]) {
     );
     let k = diffs[0];
     if k > 0 && got[k + 1..] == want[k..LEN - 1] {
-        println!("    → offset {k} に 1 バイト挿入されたずれ (挿入値 0x{:02X})", got[k]);
+        println!(
+            "    → offset {k} に 1 バイト挿入されたずれ (挿入値 0x{:02X})",
+            got[k]
+        );
     }
     println!("  {label} 全体: {got:02X?}");
 }
@@ -106,9 +126,10 @@ fn main() {
     let want = load_original(src);
 
     let api = HidApi::new().expect("initialize HID");
-    let Some(info) = api.device_list().find(|d| {
-        d.vendor_id() == 0x046D && d.product_id() == 0xC24A && d.usage_page() == 0xFF80
-    }) else {
+    let Some(info) = api
+        .device_list()
+        .find(|d| d.vendor_id() == 0x046D && d.product_id() == 0xC24A && d.usage_page() == 0xFF80)
+    else {
         eprintln!("G600 の設定用コレクション (usage page 0xFF80) が見つかりません");
         std::process::exit(1);
     };
@@ -132,6 +153,7 @@ fn main() {
             }
             println!("2 秒後に 0xF4 を 1 回書きます。マウスに触らないでください…");
             thread::sleep(Duration::from_secs(2));
+            wait_ready(&dev);
             assert_eq!(want[0], TARGET_ID, "書き込み先は 0xF4 固定");
             let sent = dev.send_feature_report(&want);
             println!("SET 0x{TARGET_ID:02X} ({LEN} bytes): {sent:?}");
@@ -184,6 +206,7 @@ fn e4(dev: &HidDevice, active: u8, want: &[u8; LEN]) {
     }
     let select = [0xF0, 0x80 | (active << 4), 0, 0];
     println!("[E4-3] 現在のプロファイル {active} を再選択 {select:02X?}");
+    wait_ready(dev);
     println!("  SET: {:?}", dev.send_feature_report(&select));
     watch_status(dev, 2000);
     if let Some(cur) = get(dev, TARGET_ID, LEN) {

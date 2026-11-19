@@ -638,3 +638,17 @@ fn failed_activation_set_waits_before_recovering() {
     assert!(driver.state.lock().unwrap().pending.is_some());
     assert_progress(&events);
 }
+
+#[test]
+fn resolution_is_not_sent_when_profile_changed_in_between() {
+    // プロファイル 2 を選んだ直後、再設定の前に本体ボタンでプロファイル 3 に変わった場合。
+    let (driver, _) = setup(0);
+    let ch = &driver.ch;
+    ch.mock_reply(&report(1));
+    ready_pair(ch, 0, 1);
+    reply_status(ch, 2, true);
+    let result = driver.apply(&Change::Profile(1));
+    assert!(matches!(result, Err(HubError::Protocol(ref m)) if m.contains("中止")));
+    // 選択の SET だけで、別プロファイル宛ての解像度 SET (0x44) は送らない。
+    assert_eq!(ch.mock_sent(), [vec![STATUS, 0x90, 0, 0]]);
+}
