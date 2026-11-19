@@ -330,6 +330,8 @@ pub struct Shell {
     pub fx_last: Instant,
     /// 起動時自動開始を試したか。
     pub fx_autostarted: bool,
+    /// マウス: 表示中のボタンレイヤー。
+    pub mouse_layer: usize,
     /// キーボード: 表示中のレイヤー。
     pub kb_layer: u8,
     /// キーボード: 選択中のキー (layout index)。
@@ -635,6 +637,7 @@ impl Shell {
             fx_on: None,
             fx_last: Instant::now(),
             fx_autostarted: false,
+            mouse_layer: 0,
             kb_layer: 0,
             kb_sel: BTreeSet::new(),
             key_group: 0,
@@ -807,6 +810,7 @@ impl Shell {
         self.dpi_sel = 0;
         self.dpi_sel_touch = false;
         self.peq_sel = 0;
+        self.mouse_layer = 0;
         self.kb_layer = 0;
         self.kb_sel.clear();
         self.macro_sel = 0;

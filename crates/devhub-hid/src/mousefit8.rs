@@ -823,6 +823,7 @@ impl MfDongleDriver {
             }
             PollingCycle => (rec(7, 0, 0), None),
             ProfileCycle => return Err(HubError::Unsupported("profile cycle (dongle)")),
+            GShift => return Err(HubError::Unsupported("G-Shift")),
             ScrollModeToggle => return Err(HubError::Unsupported("scroll-mode toggle")),
             Unsupported { .. } => return Err(HubError::Unsupported("raw action")),
         })
@@ -1347,6 +1348,8 @@ fn build_caps(info: &DeviceInfo, m: &R8Model) -> Capabilities {
             renamable: false,
         }),
         mouse: Some(MouseCaps {
+            figure: MouseFigure::Standard,
+            layers: vec![],
             dpi_min: 50,
             dpi_max: m.dpi_max,
             dpi_step: if m.sensor_3955 { 1 } else { 50 },
@@ -1460,6 +1463,7 @@ impl DeviceDriver for MfDongleDriver {
             if self.cmd(&f).is_err() {
                 self.mark_asleep(true);
                 return Ok(DeviceState {
+                    unsaved: false,
                     profile: ProfileState {
                         active: 0,
                         names: vec![],
@@ -1697,6 +1701,7 @@ impl DeviceDriver for MfDongleDriver {
         self.mark_asleep(asleep);
 
         Ok(DeviceState {
+            unsaved: false,
             profile: ProfileState {
                 active: 0,
                 names: vec![],

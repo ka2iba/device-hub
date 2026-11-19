@@ -1550,6 +1550,7 @@ impl XsydDriver {
             }
         }
         Ok(DeviceState {
+            unsaved: false,
             profile: self.read_profile().unwrap_or_default(),
             settings,
             mouse: None,
@@ -2414,6 +2415,7 @@ impl DeviceDriver for XsydDriver {
         }
         let profile = self.read_profile()?;
         Ok(DeviceState {
+            unsaved: false,
             profile,
             settings,
             mouse: None,

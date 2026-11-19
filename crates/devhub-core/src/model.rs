@@ -74,6 +74,7 @@ pub enum DriverKind {
     Lamzu,
     /// 未割り当て (検出だけできる)。
     Unsupported,
+    LogitechG600,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -329,6 +330,8 @@ pub struct ActionSpec {
     pub save: bool,
     /// 破壊的操作として赤く表示する。
     pub danger: bool,
+    /// 未保存の変更を本体に保存する。
+    pub commit: bool,
 }
 
 impl ActionSpec {
@@ -342,10 +345,15 @@ impl ActionSpec {
             file: None,
             save: false,
             danger: false,
+            commit: false,
         }
     }
     pub fn help(mut self, h: &str) -> Self {
         self.help = Some(h.into());
+        self
+    }
+    pub fn commit(mut self) -> Self {
+        self.commit = true;
         self
     }
     pub fn danger(mut self, confirm: &str) -> Self {
@@ -571,6 +579,7 @@ pub enum ButtonAction {
         /// 生パラメータバイト列。
         params: Vec<u8>,
     },
+    GShift,
 }
 
 /// ボタン割り当てで選べる種類 (デバイスごとに出し分ける)。
@@ -586,6 +595,7 @@ pub enum ButtonActionKind {
     PollingCycle,
     ProfileCycle,
     ScrollModeToggle,
+    GShift,
 }
 
 impl ButtonAction {
@@ -603,6 +613,7 @@ impl ButtonAction {
             ButtonAction::ScrollModeToggle => ButtonActionKind::ScrollModeToggle,
             // 候補に出さない: 表示用に Disabled として扱う。
             ButtonAction::Unsupported { .. } => ButtonActionKind::Disabled,
+            ButtonAction::GShift => ButtonActionKind::GShift,
         }
     }
 }
@@ -612,6 +623,19 @@ impl ButtonAction {
 pub struct ButtonSlot {
     /// 表示名 ("左ボタン" / "サイド前" …)。
     pub name: String,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MouseFigure {
+    #[default]
+    Standard,
+    Mmo12,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ButtonLayer {
+    pub name: String,
+    pub help: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -640,6 +664,9 @@ pub struct MouseCaps {
     pub live_buttons: Vec<usize>,
     /// 速度連動 DPI (AdaDPI / Adaptive DPI) のカーブ。`MouseState::adaptive` と `Change::Adaptive` が対。
     pub adaptive_dpi: Option<AdaptiveCaps>,
+    pub figure: MouseFigure,
+    /// 空なら単一レイヤー。非空なら buttons は同じ個数のレイヤーごとに並ぶ。
+    pub layers: Vec<ButtonLayer>,
 }
 
 /// 押下深さを返せるボタン 1 個分 (磁気スイッチなど)。`DeviceDriver::live_buttons`。
@@ -1191,6 +1218,8 @@ pub struct DeviceState {
     /// `PeqCaps::bands` と同じ並びのバンド。`Capabilities::peq` があるときだけ Some。
     #[serde(default)]
     pub peq: Option<Vec<PeqBand>>,
+    #[serde(default)]
+    pub unsaved: bool,
 }
 
 /// UI → ドライバの細粒度な変更。ドライバは**これ 1 件分だけ**を書けばよい。

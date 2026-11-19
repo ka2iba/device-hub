@@ -264,7 +264,7 @@ impl Shell {
                 }
                 body = body.child(ui::row("カラー", None, dots));
             }
-            {
+            if area.brightness_max > 0 {
                 let base = ls.clone();
                 let bmax = area.brightness_max as f32;
                 let f = Rc::new(move |this: &mut Shell, v: f32, cx: &mut Context<Shell>| {
@@ -746,7 +746,11 @@ fn preview_rgb(
     let dist = (dx * dx + dy * dy).sqrt();
     let ph = t * (0.25 + spd * 2.0); // 位相速度
     let wave = |x: f32| (x * std::f32::consts::TAU).sin() * 0.5 + 0.5;
-    let v = ls.brightness as f32 / area.brightness_max.max(1) as f32;
+    let v = if area.brightness_max == 0 {
+        1.0
+    } else {
+        ls.brightness as f32 / area.brightness_max as f32
+    };
     let dim = |c: Rgb, f: f32| {
         Rgb::new(
             (c.r as f32 * f * v) as u8,

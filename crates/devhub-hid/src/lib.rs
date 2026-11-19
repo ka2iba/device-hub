@@ -20,6 +20,7 @@ use std::sync::{Arc, Mutex};
 /// ATK 系ドライバ。診断 example (atkread) からも使うので公開。
 #[doc(hidden)]
 pub mod atk;
+mod g600;
 #[doc(hidden)]
 pub mod lamzu;
 #[allow(dead_code)]
@@ -53,6 +54,7 @@ fn driver_ready(kind: DriverKind) -> bool {
         DriverKind::Walkplay => true,
         DriverKind::Atk => true,
         DriverKind::Lamzu => true,
+        DriverKind::LogitechG600 => true,
         DriverKind::Unsupported => false,
     }
 }
@@ -287,6 +289,7 @@ impl RealHub {
             DriverKind::Walkplay => Arc::new(walkplay::open(dev, info)?),
             DriverKind::Atk => Arc::new(atk::open(dev, info, events)?),
             DriverKind::Lamzu => Arc::new(lamzu::open(dev, info, events)?),
+            DriverKind::LogitechG600 => Arc::new(g600::open(dev, info, events)?),
             DriverKind::Unsupported => {
                 return Err(HubError::NotImplemented("このデバイスのドライバ"))
             }

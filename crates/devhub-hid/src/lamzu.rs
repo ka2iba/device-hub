@@ -670,6 +670,7 @@ fn encode_button(a: &ButtonAction) -> HubResult<(u8, Vec<u8>)> {
         // 公式は循環パラメータ LoopUp=3 を送る。
         PollingCycle => (13, vec![3]),
         ProfileCycle => (8, vec![3]),
+        GShift => return Err(HubError::Unsupported("G-Shift")),
         ScrollModeToggle => return Err(HubError::Unsupported("scroll-mode toggle")),
         // デバイス側の未解釈割当はそのまま往復で書き戻せる。
         Unsupported { ty, params } => (*ty, params.clone()),
@@ -876,6 +877,7 @@ impl DeviceDriver for LamzuDriver {
         let buttons = (1..=5u8).map(|b| self.read_button(dev, b)).collect();
 
         Ok(DeviceState {
+            unsaved: false,
             profile: ProfileState {
                 active: prof.saturating_sub(1),
                 names: vec![],

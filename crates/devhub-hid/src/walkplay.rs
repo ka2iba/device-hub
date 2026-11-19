@@ -409,6 +409,7 @@ impl DeviceDriver for WalkplayDriver {
 
     fn read(&self) -> HubResult<DeviceState> {
         let mut st = DeviceState {
+            unsaved: false,
             profile: ProfileState {
                 active: 0,
                 names: vec![],

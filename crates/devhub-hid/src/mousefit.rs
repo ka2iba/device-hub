@@ -622,6 +622,7 @@ fn encode_gw(action: &ButtonAction) -> HubResult<(u8, Vec<u8>)> {
         }
         PollingCycle => (13, vec![3]),
         ProfileCycle => (8, vec![3]),
+        GShift => return Err(HubError::Unsupported("G-Shift")),
         ScrollModeToggle => return Err(HubError::Unsupported("scroll-mode toggle (GW)")),
         Unsupported { .. } => return Err(HubError::Unsupported("raw action")),
     })
@@ -739,6 +740,7 @@ fn encode_jm(slot: usize, action: &ButtonAction) -> HubResult<(u8, Vec<u8>)> {
         }
         PollingCycle => (7, vec![0]),
         ProfileCycle => (8, vec![3]),
+        GShift => return Err(HubError::Unsupported("G-Shift")),
         ScrollModeToggle => return Err(HubError::Unsupported("scroll-mode toggle (JM)")),
         Unsupported { .. } => return Err(HubError::Unsupported("raw action")),
     })
@@ -1106,6 +1108,8 @@ fn build_caps(info: &DeviceInfo, m: &MfModel) -> Capabilities {
         actions: vec![],
         profiles: None, // open() 後に caps へ入れるため profile_count を別途反映
         mouse: Some(MouseCaps {
+            figure: MouseFigure::Standard,
+            layers: vec![],
             dpi_min: 50,
             dpi_max: m.dpi_max,
             dpi_step: m.dpi_step,
@@ -1350,6 +1354,7 @@ impl DeviceDriver for MousefitDriver {
         }
 
         Ok(DeviceState {
+            unsaved: false,
             profile: ProfileState {
                 active: prof,
                 names: vec![],

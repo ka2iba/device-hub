@@ -296,6 +296,18 @@ pub fn button(
     cx: &mut Context<Shell>,
     on: impl Fn(&mut Shell, &mut Window, &mut Context<Shell>) + 'static,
 ) -> Stateful<Div> {
+    button_enabled(id, label, icon_name, style, true, cx, on)
+}
+
+pub fn button_enabled(
+    id: impl Into<SharedString>,
+    label: &str,
+    icon_name: Option<&str>,
+    style: Btn,
+    enabled: bool,
+    cx: &mut Context<Shell>,
+    on: impl Fn(&mut Shell, &mut Window, &mut Context<Shell>) + 'static,
+) -> Stateful<Div> {
     let p = theme::pal();
     let id: SharedString = id.into();
     let (fg, bg): (Hsla, Option<Background>) = match style {
@@ -314,11 +326,13 @@ pub fn button(
         .justify_center()
         .gap(px(7.))
         .rounded(px(theme::R_CTRL))
-        .cursor_pointer()
         .text_size(px(13.))
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(fg);
     match style {
+        Btn::Glass if !enabled => {
+            d = d.child(glass::surface(glass::Kind::Frost, theme::R_CTRL));
+        }
         Btn::Glass => {
             d = d.child(glass::surface_hover(
                 glass::Kind::Frost,
@@ -355,7 +369,11 @@ pub fn button(
     .when(!label.is_empty(), |d| {
         d.child(div().relative().child(label.to_string()))
     })
-    .on_click(cx.listener(move |this, _, w, cx| on(this, w, cx)))
+    .when(enabled, |d| {
+        d.cursor_pointer()
+            .on_click(cx.listener(move |this, _, w, cx| on(this, w, cx)))
+    })
+    .when(!enabled, |d| d.cursor_default().opacity(0.45))
 }
 
 /// 丸いアイコンボタン。
