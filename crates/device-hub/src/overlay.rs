@@ -569,6 +569,7 @@ impl Shell {
             ButtonActionKind::Macro => "マクロ",
             ButtonActionKind::PollingCycle => "ポーリング切替",
             ButtonActionKind::ProfileCycle => "プロファイル切替",
+            ButtonActionKind::GShift => "G-Shift (押している間 別割り当て)",
             ButtonActionKind::ScrollModeToggle => "上下ロール切替",
         };
         // 種類のチップ。
@@ -1005,6 +1006,9 @@ impl Shell {
             ButtonAction::ScrollModeToggle => {
                 ui::sub("ホイールの上下ロール動作を切り替えます。").into_any_element()
             }
+            ButtonAction::GShift => {
+                ui::sub("押している間、G-Shift 側 (G-Shift + Gn) の割り当てに切り替わります。").into_any_element()
+            }
             ButtonAction::Unsupported { .. } => {
                 ui::sub("このデバイスに記録されている割当は未対応の種類です。別の割当を選ぶと元には戻せません。")
                     .into_any_element()
@@ -1087,6 +1091,7 @@ fn default_action(k: ButtonActionKind) -> ButtonAction {
         ButtonActionKind::PollingCycle => ButtonAction::PollingCycle,
         ButtonActionKind::ProfileCycle => ButtonAction::ProfileCycle,
         ButtonActionKind::ScrollModeToggle => ButtonAction::ScrollModeToggle,
+        ButtonActionKind::GShift => ButtonAction::GShift,
     }
 }
 

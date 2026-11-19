@@ -14,6 +14,188 @@ const DEFAULT_COLORS: &[u32] = &[
     0xff3040, 0x2f6bff, 0x22d36b, 0xff3df5, 0xffd21a, 0xffffff, 0x2ee6ff, 0xff8a3d,
 ];
 
+fn button_slots(button_count: usize, layer_count: usize, layer: usize) -> std::ops::Range<usize> {
+    let layer_count = layer_count.max(1);
+    let per_layer = button_count / layer_count;
+    let start = layer.min(layer_count - 1) * per_layer;
+    start..start + per_layer
+}
+
+fn mmo12_outline(slots: std::ops::Range<usize>, hover_slot: Option<usize>) -> Div {
+    let p = theme::pal();
+    let mut active = [false; 20];
+    for (hot, slot) in active.iter_mut().zip(slots) {
+        *hot = hover_slot == Some(slot);
+    }
+    let fill = |index: usize| if active[index] { p.accent } else { p.key };
+    let ink = |index: usize| if active[index] { p.on_accent } else { p.fg };
+    let at = |x, y| point(px(x), px(y));
+    let rect = |x, y, width, height, radius, color| {
+        div()
+            .absolute()
+            .left(px(x))
+            .top(px(y))
+            .w(px(width))
+            .h(px(height))
+            .rounded(px(radius))
+            .border_1()
+            .border_color(p.key_edge)
+            .bg(color)
+    };
+    let key = |index, x, y, width, height, radius, font_size, text: &str| {
+        rect(x, y, width, height, radius, fill(index))
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_size(px(font_size))
+            .line_height(px(16.))
+            .font_weight(FontWeight::BOLD)
+            .text_color(ink(index))
+            .child(text.to_owned())
+    };
+
+    let outline = canvas(
+        |_, _, _| (),
+        move |bounds, (), window, _| {
+            let at = |x, y| bounds.origin + at(x, y);
+            let mut shape = |color, draw: &dyn Fn(&mut PathBuilder)| {
+                let mut fill = PathBuilder::fill();
+                let mut stroke = PathBuilder::stroke(px(1.));
+                for path in [&mut fill, &mut stroke] {
+                    draw(path);
+                    path.close();
+                }
+                if let Ok(path) = fill.build() {
+                    window.paint_path(path, color);
+                }
+                if let Ok(path) = stroke.build() {
+                    window.paint_path(path, p.key_edge);
+                }
+            };
+            let body = theme::mix(p.solid, p.fg, 0.12);
+            let panel = theme::mix(p.solid, p.fg, 0.20);
+            shape(body, &|path| {
+                path.move_to(at(22., 149.));
+                path.curve_to(at(18., 131.), at(17., 135.));
+                path.line_to(at(40., 74.));
+                path.curve_to(at(105., 54.), at(61., 64.));
+                path.line_to(at(105., 60.));
+                path.line_to(at(126., 60.));
+                path.line_to(at(126., 54.));
+                path.curve_to(at(190., 74.), at(157., 60.));
+                path.curve_to(at(214., 138.), at(200., 88.));
+                path.line_to(at(202., 190.));
+                path.line_to(at(205., 230.));
+                path.line_to(at(190., 282.));
+                path.curve_to(at(184., 291.), at(188., 288.));
+                path.line_to(at(144., 321.));
+                path.curve_to(at(136., 325.), at(140., 325.));
+                path.line_to(at(94., 325.));
+                path.curve_to(at(86., 321.), at(89., 325.));
+                path.line_to(at(45., 291.));
+                path.curve_to(at(41., 285.), at(42., 289.));
+                path.line_to(at(26., 231.));
+                path.line_to(at(30., 190.));
+            });
+            // クリック部の継ぎ目と、中央のホイールを収める切り欠き。
+            shape(panel, &|path| {
+                path.move_to(at(43., 73.));
+                path.curve_to(at(105., 54.), at(72., 61.));
+                path.line_to(at(105., 77.));
+                path.curve_to(at(90., 95.), at(90., 80.));
+                path.line_to(at(90., 146.));
+                path.line_to(at(42., 146.));
+                path.curve_to(at(43., 73.), at(38., 113.));
+            });
+            shape(panel, &|path| {
+                path.move_to(at(126., 54.));
+                path.curve_to(at(169., 65.), at(148., 58.));
+                path.curve_to(at(177., 146.), at(178., 92.));
+                path.line_to(at(126., 146.));
+            });
+            shape(panel, &|path| {
+                path.move_to(at(172., 67.));
+                path.line_to(at(190., 74.));
+                path.curve_to(at(212., 151.), at(203., 94.));
+                path.curve_to(at(180., 146.), at(200., 147.));
+                path.curve_to(at(172., 67.), at(183., 105.));
+            });
+            shape(body, &|path| {
+                path.move_to(at(4., 426.));
+                path.curve_to(at(44., 390.), at(9., 416.));
+                path.curve_to(at(72., 371.), at(48., 375.));
+                path.curve_to(at(140., 359.), at(102., 356.));
+                path.curve_to(at(189., 367.), at(176., 362.));
+                path.curve_to(at(228., 427.), at(206., 372.));
+                path.line_to(at(220., 448.));
+                path.curve_to(at(186., 451.), at(218., 450.));
+                path.line_to(at(70., 451.));
+                path.curve_to(at(10., 449.), at(35., 448.));
+            });
+        },
+    )
+    .absolute()
+    .size_full();
+
+    let mut figure = div()
+        .relative()
+        .w(px(232.))
+        .h(px(474.))
+        .child(outline)
+        .child(ui::faint("上面図").absolute().top(px(0.)))
+        .child(ui::faint("左側面図").absolute().top(px(330.)))
+        .child(ui::faint("← ケーブル / 前").absolute().top(px(351.)))
+        .child(rect(113., 24., 6., 30., 1., p.key))
+        .child(rect(110., 40., 12., 5., 1., p.solid))
+        .child(rect(110., 48., 12., 4., 1., p.solid))
+        .child(key(0, 46., 91., 41., 48., 8., 14., "G1"))
+        .child(key(1, 130., 91., 42., 48., 8., 14., "G2"))
+        .child(key(5, 181., 104., 25., 35., 6., 12., "G6"))
+        .child(rect(90., 77., 36., 110., 18., p.solid))
+        .child(rect(
+            95.,
+            82.,
+            26.,
+            100.,
+            13.,
+            theme::mix(p.solid, p.fg, 0.24),
+        ));
+    for y in [91., 98., 105., 112., 119., 158., 165., 172.] {
+        figure = figure.child(
+            div()
+                .absolute()
+                .left(px(98.))
+                .top(px(y))
+                .w(px(20.))
+                .h(px(1.))
+                .bg(theme::alpha(p.fg, 0.30)),
+        );
+    }
+    figure = figure
+        .child(key(2, 96., 125., 24., 29., 7., 12., "G3"))
+        .child(key(3, 49., 155., 41., 26., 8., 11., "◀ G4"))
+        .child(key(4, 126., 155., 41., 26., 8., 11., "G5 ▶"))
+        .child(key(7, 90., 196., 47., 29., 8., 13., "G8"))
+        .child(key(6, 90., 234., 47., 29., 8., 13., "G7"))
+        .child(rect(65., 378., 135., 70., 12., p.solid));
+    for (col, x) in [69., 101., 133., 165.].into_iter().enumerate() {
+        for (row, y) in [425., 404., 383.].into_iter().enumerate() {
+            let index = 8 + col * 3 + row;
+            figure = figure.child(key(
+                index,
+                x,
+                y,
+                29.,
+                18.,
+                5.,
+                11.,
+                &format!("G{}", index + 1),
+            ));
+        }
+    }
+    figure
+}
+
 fn mouse_parts(this: &Shell) -> Option<(MouseCaps, MouseState)> {
     let s = this.cur()?;
     Some((
@@ -89,6 +271,7 @@ pub fn action_label(a: &ButtonAction, macros: &[Option<MacroDef>]) -> String {
         ButtonAction::PollingCycle => "ポーリング切替".into(),
         ButtonAction::ProfileCycle => "プロファイル切替".into(),
         ButtonAction::ScrollModeToggle => "上下ロール切替".into(),
+        ButtonAction::GShift => "G-Shift (押している間 別割り当て)".into(),
         ButtonAction::Unsupported { ty, .. } => format!("未対応の割当 (type {ty})"),
     }
 }
@@ -522,7 +705,11 @@ impl Shell {
         let Some((mc, ms)) = mouse_parts(self) else {
             return div().into_any_element();
         };
-        let hover_slot = (0..mc.buttons.len()).find(|i| motion::hovered(&format!("btnrow:{i}")));
+        let layer = self.mouse_layer.min(mc.layers.len().saturating_sub(1));
+        let slots = button_slots(mc.buttons.len(), mc.layers.len(), layer);
+        let hover_slot = slots
+            .clone()
+            .find(|i| motion::hovered(&format!("btnrow:{i}")));
 
         // マウスの図。
         let mark = |n: usize, x: f32, y: f32, hot: bool| {
@@ -545,93 +732,129 @@ impl Shell {
                 .text_color(if hot { p.on_accent } else { p.fg })
                 .border_1()
                 .border_color(p.edge)
-                .child(format!("{}", n + 1))
+                .child((n + 1).to_string())
         };
-        let positions = [
+        let standard_positions = [
             (70., 70.),
             (150., 70.),
             (110., 62.),
             (34., 150.),
             (34., 112.),
         ];
-        let mut figure = div()
-            .relative()
-            .w(px(220.))
-            .h(px(300.))
-            .child(
-                // 胴体
-                div()
-                    .absolute()
-                    .left(px(40.))
-                    .top(px(20.))
-                    .w(px(140.))
-                    .h(px(250.))
-                    .rounded_t(px(70.))
-                    .rounded_b(px(62.))
-                    .bg(linear_gradient(
-                        160.,
-                        linear_color_stop(theme::alpha(p.fg, 0.16), 0.),
-                        linear_color_stop(theme::alpha(p.fg, 0.05), 1.),
-                    ))
-                    .border_1()
-                    .border_color(p.edge),
-            )
-            .child(
-                div()
-                    .absolute()
-                    .left(px(110.))
-                    .top(px(22.))
-                    .w(px(1.))
-                    .h(px(90.))
-                    .bg(p.hair),
-            )
-            .child(
-                // ホイール
-                div()
-                    .absolute()
-                    .left(px(103.))
-                    .top(px(44.))
-                    .w(px(14.))
-                    .h(px(34.))
-                    .rounded(px(7.))
-                    .bg(theme::alpha(p.fg, 0.25)),
-            )
-            .child(
-                div()
-                    .absolute()
-                    .left(px(36.))
-                    .top(px(100.))
-                    .w(px(6.))
-                    .h(px(24.))
-                    .rounded(px(3.))
-                    .bg(theme::alpha(p.fg, 0.3)),
-            )
-            .child(
-                div()
-                    .absolute()
-                    .left(px(36.))
-                    .top(px(138.))
-                    .w(px(6.))
-                    .h(px(24.))
-                    .rounded(px(3.))
-                    .bg(theme::alpha(p.fg, 0.3)),
-            );
-        for (i, (x, y)) in positions.iter().enumerate().take(mc.buttons.len()) {
-            figure = figure.child(mark(i, *x, *y, hover_slot == Some(i)));
-        }
+        let standard = || {
+            div()
+                .relative()
+                .w(px(220.))
+                .h(px(300.))
+                .child(
+                    // 胴体
+                    div()
+                        .absolute()
+                        .left(px(40.))
+                        .top(px(20.))
+                        .w(px(140.))
+                        .h(px(250.))
+                        .rounded_t(px(70.))
+                        .rounded_b(px(62.))
+                        .bg(linear_gradient(
+                            160.,
+                            linear_color_stop(theme::alpha(p.fg, 0.16), 0.),
+                            linear_color_stop(theme::alpha(p.fg, 0.05), 1.),
+                        ))
+                        .border_1()
+                        .border_color(p.edge),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(110.))
+                        .top(px(22.))
+                        .w(px(1.))
+                        .h(px(90.))
+                        .bg(p.hair),
+                )
+                .child(
+                    // ホイール
+                    div()
+                        .absolute()
+                        .left(px(103.))
+                        .top(px(44.))
+                        .w(px(14.))
+                        .h(px(34.))
+                        .rounded(px(7.))
+                        .bg(theme::alpha(p.fg, 0.25)),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(36.))
+                        .top(px(100.))
+                        .w(px(6.))
+                        .h(px(24.))
+                        .rounded(px(3.))
+                        .bg(theme::alpha(p.fg, 0.3)),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(36.))
+                        .top(px(138.))
+                        .w(px(6.))
+                        .h(px(24.))
+                        .rounded(px(3.))
+                        .bg(theme::alpha(p.fg, 0.3)),
+                )
+        };
+        let figure = match mc.figure {
+            MouseFigure::Standard => {
+                let mut figure = standard();
+                for (index, (slot, (x, y))) in slots.clone().zip(standard_positions).enumerate() {
+                    figure = figure.child(mark(index, x, y, hover_slot == Some(slot)));
+                }
+                figure
+            }
+            MouseFigure::Mmo12 => mmo12_outline(slots.clone(), hover_slot),
+        };
 
         let mut list = ui::body().pt(px(4.));
-        for (i, slot) in mc.buttons.iter().enumerate() {
+        if mc.layers.len() >= 2 {
+            let names: Vec<_> = mc.layers.iter().map(|layer| layer.name.clone()).collect();
+            list = list.child(
+                div()
+                    .px(px(10.))
+                    .py(px(8.))
+                    .flex()
+                    .flex_col()
+                    .gap(px(6.))
+                    .child(ui::segmented(
+                        "mouse-layer",
+                        &names,
+                        layer,
+                        cx,
+                        |this, i, cx| {
+                            this.mouse_layer = i;
+                            cx.notify();
+                        },
+                    ))
+                    .when_some(mc.layers[layer].help.as_deref(), |d, help| {
+                        d.child(ui::faint(help.to_owned()))
+                    }),
+            );
+        }
+        for (index, i) in slots.enumerate() {
+            let slot = &mc.buttons[i];
             let a = ms.buttons.get(i).cloned().unwrap_or(ButtonAction::Disabled);
             let label = action_label(&a, &ms.macros);
-            let changed = !matches!(
-                (i, &a),
-                (0, ButtonAction::Mouse(MouseFn::Left))
-                    | (1, ButtonAction::Mouse(MouseFn::Right))
-                    | (2, ButtonAction::Mouse(MouseFn::Middle))
-                    | (3, ButtonAction::Mouse(MouseFn::Back))
-                    | (4, ButtonAction::Mouse(MouseFn::Forward))
-            );
+            let changed = layer == 0
+                && index < 5
+                && !matches!(
+                    (index, &a),
+                    (0, ButtonAction::Mouse(MouseFn::Left))
+                        | (1, ButtonAction::Mouse(MouseFn::Right))
+                        | (2, ButtonAction::Mouse(MouseFn::Middle))
+                        | (3, ButtonAction::Mouse(MouseFn::Back))
+                        | (4, ButtonAction::Mouse(MouseFn::Forward))
+                );
             let key = format!("btnrow:{i}");
             let a2 = a.clone();
             list = list.child(
@@ -667,7 +890,7 @@ impl Shell {
                             } else {
                                 p.fg
                             })
-                            .child(format!("{}", i + 1)),
+                            .child(format!("{}", index + 1)),
                     )
                     .child(
                         div()
@@ -749,7 +972,9 @@ impl Shell {
                         .items_center()
                         .gap(px(8.))
                         .child(figure)
-                        .child(ui::faint("上から見た図 · 番号は右の一覧に対応")),
+                        .when(mc.figure == MouseFigure::Standard, |d| {
+                            d.child(ui::faint("上から見た図 · 番号は右の一覧に対応"))
+                        }),
                 ),
             )
             .child(
@@ -767,4 +992,23 @@ impl Shell {
 
 thread_local! {
     static INPUT_SYNC: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::button_slots;
+
+    #[test]
+    fn button_slots_for_single_layer() {
+        assert_eq!(button_slots(5, 0, 0), 0..5);
+        assert_eq!(button_slots(5, 1, 0), 0..5);
+        assert_eq!(button_slots(0, 0, 0), 0..0);
+    }
+
+    #[test]
+    fn button_slots_for_two_layers() {
+        assert_eq!(button_slots(40, 2, 0), 0..20);
+        assert_eq!(button_slots(40, 2, 1), 20..40);
+        assert_eq!(button_slots(40, 2, 2), 20..40);
+    }
 }

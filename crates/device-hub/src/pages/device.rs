@@ -106,6 +106,11 @@ impl Shell {
         let running = s.running.clone();
         let progress = s.progress.clone();
         let caps = s.caps.clone();
+        let commit = caps
+            .as_ref()
+            .and_then(|caps| caps.actions.iter().find(|action| action.commit))
+            .cloned();
+        let can_commit = s.can_commit();
         let profile = s.state.as_ref().map(|st| st.profile.clone());
         let name = self
             .prefs
@@ -162,12 +167,12 @@ impl Shell {
                         .flex()
                         .items_center()
                         .gap(px(8.))
-                        .child(ui::faint("プロファイル"))
+                        // 選択欄に「プロファイル N」が出るのでラベルは付けない (名前欄の幅を確保する)。
                         .child(ui::select(
                             "profile",
                             items,
                             &cur,
-                            190.,
+                            150.,
                             cx,
                             move |this, i, _, cx| {
                                 this.apply(Change::Profile(i as u8), cx);
@@ -188,7 +193,7 @@ impl Shell {
                 .flex()
                 .flex_col()
                 .gap(px(4.))
-                .w(px(180.))
+                .w(px(120.))
                 .child(ui::faint(match frac {
                     Some(f) => format!("{label} {:.0}%", f * 100.),
                     None => format!("{label}…"),
@@ -260,12 +265,17 @@ impl Shell {
                             .flex()
                             .items_center()
                             .gap(px(6.))
-                            .child(ui::title(name.clone()))
-                            .child(ui::icon_button(
-                                "rename",
-                                "pencil",
-                                cx,
-                                move |this, w, cx| {
+                            .min_w_0()
+                            // 長い名前は省略表示にして、鉛筆と右隣のプロファイル切替に重ならないようにする。
+                            .child(
+                                ui::title(name.clone())
+                                    .min_w_0()
+                                    .whitespace_nowrap()
+                                    .overflow_hidden()
+                                    .text_ellipsis(),
+                            )
+                            .child(
+                                ui::icon_button("rename", "pencil", cx, move |this, w, cx| {
                                     let idr = id_rename.clone();
                                     let orig = orig_name.clone();
                                     this.modal = Some(Modal::Text {
@@ -290,8 +300,9 @@ impl Shell {
                                     this.input("modal", "", "", w, cx);
                                     this.set_input("modal", &cur, w, cx);
                                     cx.notify();
-                                },
-                            )),
+                                })
+                                .flex_none(),
+                            ),
                     )
                     .child(
                         div()
@@ -309,7 +320,17 @@ impl Shell {
             .when_some(profile_ctl, |d, c| d.child(c))
             .when_some(self.preset_quick(&info.model, cx), |d, e| d.child(e))
             .child(self.undo_redo(cx))
-            .child(sync)
+            // 状態表示 (同期済み / 書き込み中 / 実行中… / 進捗バー) は文字数が変わるので、
+            // 幅を固定し、先頭の丸を起点に左揃えにして周りを動かさない (ちらつき防止)。
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(120.))
+                    .overflow_hidden()
+                    .flex()
+                    .justify_start()
+                    .child(sync),
+            )
             .child(ui::icon_button(
                 "reload",
                 "refresh-cw",
@@ -319,6 +340,21 @@ impl Shell {
                     this.toast("デバイスから読み直しています", false, cx);
                 },
             ))
+            .when_some(commit, |d, action| {
+                let label = action.label.clone();
+                d.child(
+                    ui::button_enabled(
+                        "commit-pending",
+                        &label,
+                        Some("save"),
+                        Btn::Glass,
+                        can_commit,
+                        cx,
+                        move |this, w, cx| this.start_action(&action, w, cx),
+                    )
+                    .flex_none(),
+                )
+            })
     }
 
     fn loading_card(&self) -> impl IntoElement {

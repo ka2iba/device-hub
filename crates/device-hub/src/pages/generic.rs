@@ -70,7 +70,7 @@ impl Shell {
             let actions: Vec<ActionSpec> = caps
                 .actions
                 .iter()
-                .filter(|a| a.section == sec && !a.id.ends_with("_finish"))
+                .filter(|a| a.section == sec && !a.commit && !a.id.ends_with("_finish"))
                 // DEF は EQ カードのプリセットに含める。
                 .filter(|a| !(caps.peq.is_some() && a.id == "eq_def"))
                 .cloned()
@@ -313,6 +313,9 @@ impl Shell {
         let Some(id) = self.device_id() else { return };
         if self.cur().and_then(|s| s.running.as_ref()).is_some() {
             self.toast("別の操作を実行中です", true, cx);
+            return;
+        }
+        if a.commit && !self.cur().is_some_and(|s| s.can_commit()) {
             return;
         }
         // キャリブレーションはウィザードで行う (押下深さを見ながら全キーを確認する)。

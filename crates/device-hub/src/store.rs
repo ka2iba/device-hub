@@ -200,6 +200,12 @@ pub struct Session {
 }
 
 impl Session {
+    pub fn can_commit(&self) -> bool {
+        self.state.as_ref().is_some_and(|state| state.unsaved)
+            && self.progress.is_none()
+            && self.running.is_none()
+    }
+
     pub fn ready(&self) -> bool {
         self.status == Status::Ready && self.caps.is_some() && self.state.is_some()
     }

@@ -91,7 +91,11 @@ impl Shell {
                         PalAction::Tab(t),
                     ));
                 }
-                for a in c.actions.iter().filter(|a| !a.id.ends_with("_finish")) {
+                for a in c
+                    .actions
+                    .iter()
+                    .filter(|a| !a.id.ends_with("_finish") && (!a.commit || s.can_commit()))
+                {
                     v.push(it(
                         a.label.clone(),
                         "操作を実行",

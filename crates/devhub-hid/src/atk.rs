@@ -428,6 +428,7 @@ impl AtkDriver {
             Key(_) => rec(5, 0, 0),
             Media(_) => return Err(HubError::Unsupported("media button")),
             ProfileCycle => return Err(HubError::Unsupported("profile cycle")),
+            GShift => return Err(HubError::Unsupported("G-Shift")),
             ScrollModeToggle => return Err(HubError::Unsupported("scroll-mode toggle")),
             Unsupported { .. } => return Err(HubError::Unsupported("raw action")),
         })
@@ -518,6 +519,8 @@ fn build_caps() -> Capabilities {
             renamable: false,
         }),
         mouse: Some(MouseCaps {
+            figure: MouseFigure::Standard,
+            layers: vec![],
             dpi_min: 50,
             dpi_max: 42000,
             dpi_step: 1,
@@ -678,6 +681,7 @@ impl DeviceDriver for AtkDriver {
             .and_then(|r| r.get(6).copied())
             .unwrap_or(0);
         Ok(DeviceState {
+            unsaved: false,
             profile: ProfileState {
                 active: profile.min(3),
                 names: vec![],

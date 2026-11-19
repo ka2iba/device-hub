@@ -42,6 +42,7 @@ pub struct MockIo {
     pub sent: Vec<Vec<u8>>,
     pub replies: std::collections::VecDeque<Vec<u8>>,
     fail_send: Option<Vec<u8>>,
+    feature_ops: Vec<(bool, u8)>,
 }
 
 #[allow(dead_code)]
@@ -174,6 +175,77 @@ impl Channel {
         }
     }
 
+    /// ID 込みの番号付き feature report を読む。
+    pub fn get_feature_id(&self, rid: u8, len: usize) -> HubResult<Vec<u8>> {
+        let reply = match &self.inner {
+            Inner::Hid(dev) => {
+                let mut buf = [0; 256];
+                buf[0] = rid;
+                let n = dev
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .get_feature_report(&mut buf)
+                    .map_err(numbered_feature_error)?;
+                buf[..n.min(buf.len())].to_vec()
+            }
+            #[cfg(test)]
+            Inner::Mock(m) => {
+                let mut io = m.lock().unwrap_or_else(|p| p.into_inner());
+                io.feature_ops.push((false, rid));
+                io.replies
+                    .pop_front()
+                    .ok_or_else(|| HubError::Protocol("mock: no reply".into()))?
+            }
+        };
+        if reply.len() < len || reply.first() != Some(&rid) {
+            return Err(HubError::Protocol(format!(
+                "feature report {rid:#04x}: 応答 ID または長さが不正です"
+            )));
+        }
+        Ok(reply[..len].to_vec())
+    }
+
+    /// ID 込みの番号付き feature report を送る。
+    pub fn send_feature_id(&self, data: &[u8]) -> HubResult<()> {
+        if data.is_empty() {
+            return Err(HubError::Invalid("feature report ID がありません".into()));
+        }
+        match &self.inner {
+            Inner::Hid(dev) => dev
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .send_feature_report(data)
+                .map_err(numbered_feature_error),
+            #[cfg(test)]
+            Inner::Mock(m) => {
+                let mut io = m.lock().unwrap_or_else(|p| p.into_inner());
+                io.feature_ops.push((true, data[0]));
+                io.sent.push(data.to_vec());
+                if io
+                    .fail_send
+                    .as_ref()
+                    .is_some_and(|prefix| data.starts_with(prefix))
+                {
+                    io.fail_send = None;
+                    return Err(HubError::Io("mock: feature write failed".into()));
+                }
+                Ok(())
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub fn mock_feature_ops(&self) -> Vec<(bool, u8)> {
+        match &self.inner {
+            Inner::Mock(m) => m
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .feature_ops
+                .clone(),
+            _ => vec![],
+        }
+    }
+
     /// 64B feature report を送る (report ID 0)。mouse.fit 系の全コマンドに使う。
     pub fn send_feature(&self, body: &[u8; 64]) -> HubResult<()> {
         match &self.inner {
@@ -229,5 +301,40 @@ impl Channel {
                 Ok(buf)
             }
         }
+    }
+}
+
+fn numbered_feature_error(error: hidapi::HidError) -> HubError {
+    let disconnected = match &error {
+        hidapi::HidError::IoError { error: io } => {
+            io.kind() == std::io::ErrorKind::NotConnected
+                || (cfg!(windows) && io.raw_os_error() == Some(1167))
+                || (cfg!(target_os = "linux") && io.raw_os_error() == Some(19))
+        }
+        // hidapi の C バックエンドは OS のエラーを文字列で返す。
+        hidapi::HidError::HidApiError { message } => {
+            message.contains("(0x0000048F)")
+                || (cfg!(target_os = "linux") && message.ends_with(": No such device"))
+        }
+        _ => false,
+    };
+    if disconnected {
+        HubError::Disconnected
+    } else {
+        HubError::Io(format!("hid numbered feature report: {error}"))
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn numbered_feature_distinguishes_disconnect_from_io_failure() {
+    for (message, disconnected) in [
+        ("HidD_SetFeature: (0x0000048F) device disconnected", true),
+        ("Get Feature Report: (0x0000001F) general failure", false),
+    ] {
+        let error = numbered_feature_error(hidapi::HidError::HidApiError {
+            message: message.into(),
+        });
+        assert_eq!(matches!(error, HubError::Disconnected), disconnected);
     }
 }

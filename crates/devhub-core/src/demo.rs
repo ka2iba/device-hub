@@ -794,6 +794,8 @@ pub fn mouse_caps(wireless: bool, magnetic: bool) -> Capabilities {
         actions,
         profiles: None,
         mouse: Some(MouseCaps {
+            figure: MouseFigure::Standard,
+            layers: vec![],
             dpi_min: 50,
             dpi_max: 40_000,
             dpi_step: 10,
@@ -822,6 +824,7 @@ pub fn mouse_caps(wireless: bool, magnetic: bool) -> Capabilities {
                 ButtonActionKind::PollingCycle,
                 ButtonActionKind::ScrollModeToggle,
                 ButtonActionKind::Disabled,
+                ButtonActionKind::GShift,
             ],
             require_left_click: true,
             macros: Some(macro_caps_mouse()),
@@ -866,6 +869,7 @@ fn mouse_state(caps: &Capabilities) -> DeviceState {
     }
     let m = caps.mouse.as_ref().expect("mouse caps");
     DeviceState {
+        unsaved: false,
         profile: ProfileState::default(),
         settings,
         mouse: Some(MouseState {
@@ -1348,6 +1352,7 @@ fn keyboard_state(caps: &Capabilities) -> DeviceState {
     }
     let slots = k.macros.as_ref().map(|m| m.slots as usize).unwrap_or(0);
     DeviceState {
+        unsaved: false,
         profile: ProfileState {
             active: 0,
             names: vec![
@@ -1498,6 +1503,7 @@ fn dac_state(caps: &Capabilities) -> DeviceState {
     }
     let freqs = [31u16, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
     DeviceState {
+        unsaved: false,
         profile: ProfileState::default(),
         settings,
         mouse: None,
@@ -1560,6 +1566,7 @@ fn lamzu_state(caps: &Capabilities) -> DeviceState {
         })
         .collect();
     DeviceState {
+        unsaved: false,
         profile: ProfileState::default(),
         settings,
         mouse: Some(MouseState {
